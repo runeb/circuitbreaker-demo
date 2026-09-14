@@ -1,28 +1,36 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
-import {
-  CircuitBreaker,
-  CircuitOpenError,
-  TimeoutError,
-  DEFAULT_CONFIG,
-} from './breaker.ts';
-import { MockDependency } from './dependency.ts';
+import { CircuitOpenError, TimeoutError, DEFAULT_CONFIG } from './breaker.ts';
+import { SessionStore, type Session } from './sessions.ts';
 import { logger } from './logger.ts';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 
-const dependency = new MockDependency();
-const breaker = new CircuitBreaker(DEFAULT_CONFIG);
+const sessions = new SessionStore({
+  // State changes are the only per-call event worth logging: individual calls run
+  // at several per second and would drown everything else.
+  onTransition: (session, t) =>
+    logger.warn(
+      { session: short(session.id), from: t.from, to: t.to, reason: t.reason },
+      'circuit breaker state change',
+    ),
+});
 
-// State changes are the only thing worth logging per-event: individual calls
-// run at several per second and would drown everything else.
-breaker.onTransition = (t) =>
-  logger.warn({ from: t.from, to: t.to, reason: t.reason }, 'circuit breaker state change');
+/**
+ * Each viewer drives their own breaker and dependency, keyed by an id the page
+ * generates on load. Reloading gets you a clean demo; a second tab is a second,
+ * independent one.
+ */
+function sessionFor(req: express.Request): Session {
+  const raw = req.get('x-demo-session');
+  const id = typeof raw === 'string' && /^[\w-]{8,64}$/.test(raw) ? raw : 'anonymous';
+  return sessions.get(id);
+}
 
-const app = express();
-app.use(express.json());
-app.use(express.static(PUBLIC_DIR));
+function short(id: string): string {
+  return id.slice(0, 8);
+}
 
 /**
  * Each outcome gets the status code it actually deserves, so the demo teaches
@@ -36,15 +44,29 @@ const STATUS = {
   rejected: 503, // Service Unavailable - we never called it
 } as const;
 
+const app = express();
+app.use(express.json());
+app.use(express.static(PUBLIC_DIR));
+
 /** The client-facing endpoint the browser hammers. */
-app.get('/api/call', async (_req, res) => {
+app.get('/api/call', async (req, res) => {
+  const { breaker, dependency } = sessionFor(req);
   const started = Date.now();
+
+  // Snapshot before the call, not just after. Taking it first also applies any
+  // due OPEN -> HALF_OPEN transition, so this names the state that actually
+  // decides this request's fate. A probe that fails re-opens the breaker before
+  // the call returns, so the state on the way out has already forgotten that
+  // this request was ever admitted as a probe.
+  const admittedIn = breaker.snapshot().state;
+
   try {
     const result = await breaker.call(() => dependency.call());
     res.status(STATUS.success).json({
       ok: true,
       outcome: 'success',
       status: STATUS.success,
+      admittedIn,
       detail: result.value,
       latencyMs: Date.now() - started,
       breaker: breaker.snapshot(),
@@ -66,6 +88,7 @@ app.get('/api/call', async (_req, res) => {
       ok: false,
       outcome,
       status: STATUS[outcome],
+      admittedIn,
       detail: err instanceof Error ? err.message : String(err),
       latencyMs: Date.now() - started,
       breaker: breakerState,
@@ -74,25 +97,32 @@ app.get('/api/call', async (_req, res) => {
 });
 
 /** Breaker + dependency state, for polling while idle. */
-app.get('/api/state', (_req, res) => {
+app.get('/api/state', (req, res) => {
+  const { breaker, dependency } = sessionFor(req);
   res.json({
     breaker: breaker.snapshot(),
     dependency: dependency.config,
     callsReceived: dependency.callsReceived,
+    viewers: sessions.size,
   });
 });
 
-/** The user's knobs on the dependency. */
+/** The user's knobs on their own dependency. */
 app.post('/api/dependency', (req, res) => {
+  const session = sessionFor(req);
   const { latencyMs, errorRate, down } = req.body ?? {};
-  if (typeof latencyMs === 'number') dependency.config.latencyMs = clamp(latencyMs, 0, 10_000);
-  if (typeof errorRate === 'number') dependency.config.errorRate = clamp(errorRate, 0, 1);
-  if (typeof down === 'boolean') dependency.config.down = down;
-  logger.info({ dependency: dependency.config }, 'dependency health changed');
-  res.json(dependency.config);
+  const config = session.dependency.config;
+
+  if (typeof latencyMs === 'number') config.latencyMs = clamp(latencyMs, 0, 10_000);
+  if (typeof errorRate === 'number') config.errorRate = clamp(errorRate, 0, 1);
+  if (typeof down === 'boolean') config.down = down;
+
+  logger.info({ session: short(session.id), dependency: config }, 'dependency health changed');
+  res.json(config);
 });
 
-app.post('/api/reset', (_req, res) => {
+app.post('/api/reset', (req, res) => {
+  const { breaker } = sessionFor(req);
   breaker.reset();
   res.json(breaker.snapshot());
 });
@@ -102,5 +132,5 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 app.listen(PORT, () => {
-  logger.info({ port: PORT, breaker: breaker.config }, 'circuit breaker demo listening');
+  logger.info({ port: PORT, breaker: DEFAULT_CONFIG }, 'circuit breaker demo listening');
 });

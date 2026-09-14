@@ -1,5 +1,16 @@
 const $ = (id) => document.getElementById(id);
 
+// This tab drives its own breaker and dependency. A reload starts a clean demo;
+// a second tab is a second, independent one.
+const SESSION_ID = crypto.randomUUID();
+
+function api(path, options = {}) {
+  return fetch(path, {
+    ...options,
+    headers: { ...options.headers, 'x-demo-session': SESSION_ID },
+  });
+}
+
 const WINDOW = 50;    // responses summarised by the counters
 const HISTORY = 220;  // bars kept on the timeline
 const recent = [];    // { outcome, latencyMs, breaker }
@@ -23,7 +34,7 @@ async function fire() {
   if (inFlight > 20) return;
   inFlight++;
   try {
-    const res = await fetch('/api/call');
+    const res = await api('/api/call');
     render(await res.json());
   } catch {
     render({ ok: false, outcome: 'error', status: 0, detail: 'network error', latencyMs: 0 });
@@ -91,13 +102,16 @@ function addTick(r) {
   const bar = document.createElement('div');
   bar.className = `tick ${TONE[r.outcome] ?? 'err'}`;
   bar.style.height = `${barHeight(r.latencyMs, timeoutMs)}%`;
-  bar.title = `${r.status ?? '---'} ${r.outcome} \u00b7 ${r.latencyMs}ms`;
+  bar.title = `${r.status ?? '---'} ${r.outcome} @ ${r.admittedIn ?? '?'} \u00b7 ${r.latencyMs}ms`;
   laneOutcomes.append(bar);
 
-  const state = r.breaker?.state ?? 'CLOSED';
+  // The band shows the state that handled each response, not the state it left
+  // behind: a probe that fails has already re-opened the breaker by then, which
+  // is why HALF_OPEN was never visible here.
+  const state = r.admittedIn ?? r.breaker?.state ?? 'CLOSED';
   const cell = document.createElement('div');
   cell.className = `cell ${state}`;
-  cell.title = state;
+  cell.title = `admitted in ${state}`;
   laneState.append(cell);
 
   while (laneOutcomes.childElementCount > HISTORY) laneOutcomes.firstElementChild.remove();
@@ -162,7 +176,7 @@ let pendingPatch = {};
 const flushDependency = throttle(() => {
   const patch = pendingPatch;
   pendingPatch = {};
-  fetch('/api/dependency', {
+  api('/api/dependency', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(patch),
@@ -174,15 +188,20 @@ function pushDependency(patch) {
   flushDependency();
 }
 
+
 /** The server owns the dependency's health, so the controls start from it. */
 function syncControls(dep) {
   const errorPercent = Math.round(dep.errorRate * 100);
-  $('in-latency').value = dep.latencyMs;
-  $('out-latency').textContent = `${dep.latencyMs} ms`;
-  $('in-error').value = errorPercent;
-  $('out-error').textContent = `${errorPercent} %`;
-  $('in-down').checked = dep.down;
+  setControl($('in-latency'), $('out-latency'), dep.latencyMs, `${dep.latencyMs} ms`);
+  setControl($('in-error'), $('out-error'), errorPercent, `${errorPercent} %`);
+  if ($('in-down').checked !== dep.down) $('in-down').checked = dep.down;
   describeDependency();
+}
+
+/** Only write when the value actually differs; this runs several times a second. */
+function setControl(input, output, value, label) {
+  if (Number(input.value) !== value) input.value = value;
+  if (output.textContent !== label) output.textContent = label;
 }
 
 function describeDependency() {
@@ -216,7 +235,7 @@ $('in-rate').addEventListener('input', (e) => {
 });
 
 $('reset').addEventListener('click', async () => {
-  const res = await fetch('/api/reset', { method: 'POST' });
+  const res = await api('/api/reset', { method: 'POST' });
   renderBreaker(await res.json());
 });
 
@@ -224,7 +243,7 @@ $('reset').addEventListener('click', async () => {
 // The breaker's OPEN -> HALF_OPEN transition is time-based, so keep the panel
 // live (and the countdown ticking) even when no request has just returned.
 setInterval(async () => {
-  const res = await fetch('/api/state');
+  const res = await api('/api/state');
   const s = await res.json();
   renderBreaker(s.breaker);
   $('c-reached').textContent = s.callsReceived;
@@ -232,7 +251,7 @@ setInterval(async () => {
 
 // Another tab (or a curl) may already have changed the dependency; don't show
 // hardcoded defaults that disagree with the server.
-fetch('/api/state')
+api('/api/state')
   .then((r) => r.json())
   .then((s) => {
     syncControls(s.dependency);
