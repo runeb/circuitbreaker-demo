@@ -39,6 +39,23 @@
   </div>
 </section>
 
+<section class="panel timeline">
+  <h2>Timeline <span class="muted">one bar per response, newest on the right — bar height is latency</span></h2>
+  <div class="lane" id="lane-outcomes"></div>
+  <div class="lane-state" id="lane-state"></div>
+  <div class="legend">
+    <span><i class="sw ok"></i>success</span>
+    <span><i class="sw err"></i>error</span>
+    <span><i class="sw warn"></i>timeout</span>
+    <span><i class="sw rej"></i>rejected</span>
+    <span class="legend-gap"></span>
+    <span class="muted">breaker:</span>
+    <span><i class="sw band-CLOSED"></i>closed</span>
+    <span><i class="sw band-HALF_OPEN"></i>half-open</span>
+    <span><i class="sw band-OPEN"></i>open</span>
+  </div>
+</section>
+
 <section class="panels">
   <div class="panel">
     <h2>Responses <span class="muted" id="window-note">(last 50)</span></h2>

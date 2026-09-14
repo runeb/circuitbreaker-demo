@@ -162,3 +162,56 @@ input[type=range] { width: 100%; margin-top: 6px; accent-color: var(--accent); }
 label.toggle { display: flex; align-items: center; gap: 8px; color: var(--text); }
 label.toggle input { accent-color: var(--err); width: 16px; height: 16px; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+
+/* ---- timeline ---- */
+
+.timeline { max-width: 1100px; margin: 0 auto 16px; }
+
+/* Bars grow from the right; older ones are clipped off the left edge. */
+.lane {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 1px;
+  height: 68px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+.tick { flex: 0 0 6px; border-radius: 1px 1px 0 0; }
+.tick.ok { background: var(--ok); }
+.tick.err { background: var(--err); }
+.tick.warn { background: var(--warn); }
+.tick.rej { background: var(--rej); }
+
+/* One cell per bar above it, so the state band lines up with the responses. */
+.lane-state {
+  display: flex;
+  justify-content: flex-end;
+  height: 8px;
+  margin-top: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+.cell { flex: 0 0 7px; }
+.cell.CLOSED { background: #275f39; }
+.cell.HALF_OPEN { background: #7a5e18; }
+.cell.OPEN { background: #4f3382; }
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.legend span { display: flex; align-items: center; gap: 5px; }
+.legend-gap { flex: 1; }
+.sw { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.sw.ok { background: var(--ok); }
+.sw.err { background: var(--err); }
+.sw.warn { background: var(--warn); }
+.sw.rej { background: var(--rej); }
+.sw.band-CLOSED { background: #275f39; }
+.sw.band-HALF_OPEN { background: #7a5e18; }
+.sw.band-OPEN { background: #4f3382; }

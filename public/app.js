@@ -1,7 +1,8 @@
 const $ = (id) => document.getElementById(id);
 
-const WINDOW = 50;
-const recent = []; // { outcome, latencyMs }
+const WINDOW = 50;    // responses summarised by the counters
+const HISTORY = 220;  // bars kept on the timeline
+const recent = [];    // { outcome, latencyMs, breaker }
 
 let rate = 8;          // requests per second
 let timer = null;
@@ -37,7 +38,8 @@ const TONE = { success: 'ok', error: 'err', timeout: 'warn', rejected: 'rej' };
 
 function render(r) {
   recent.push(r);
-  if (recent.length > WINDOW) recent.shift();
+  if (recent.length > HISTORY) recent.shift();
+  addTick(r);
 
   const tone = TONE[r.outcome] ?? 'err';
   pulse('node-browser', tone);
@@ -52,17 +54,51 @@ function render(r) {
 
   $('last-response').textContent = `${r.outcome.padEnd(9)} ${String(r.latencyMs).padStart(5)}ms  ${r.detail ?? ''}`;
 
+  const window = recent.slice(-WINDOW);
   const counts = { success: 0, error: 0, timeout: 0, rejected: 0 };
-  for (const x of recent) counts[x.outcome] = (counts[x.outcome] ?? 0) + 1;
+  for (const x of window) counts[x.outcome] = (counts[x.outcome] ?? 0) + 1;
   $('c-success').textContent = counts.success;
   $('c-error').textContent = counts.error;
   $('c-timeout').textContent = counts.timeout;
   $('c-rejected').textContent = counts.rejected;
 
-  const lats = recent.map((x) => x.latencyMs).sort((a, b) => a - b);
+  const lats = window.map((x) => x.latencyMs).sort((a, b) => a - b);
   $('c-latency').textContent = lats.length ? `${lats[Math.floor(lats.length / 2)]} ms` : '–';
 
   if (r.breaker) renderBreaker(r.breaker);
+}
+
+// ---- timeline -----------------------------------------------------------
+
+const laneOutcomes = $('lane-outcomes');
+const laneState = $('lane-state');
+
+/**
+ * Latency on a log scale: linear would squash a healthy 20ms response into the
+ * same stub as a 0ms rejection, and telling those two apart is the whole point.
+ */
+function barHeight(ms, timeoutMs) {
+  const fullScale = timeoutMs * 1.2;
+  const frac = Math.min(1, Math.log10(1 + ms) / Math.log10(1 + fullScale));
+  return Math.max(4, frac * 100);
+}
+
+function addTick(r) {
+  const timeoutMs = r.breaker?.config.timeoutMs ?? 1000;
+  const bar = document.createElement('div');
+  bar.className = `tick ${TONE[r.outcome] ?? 'err'}`;
+  bar.style.height = `${barHeight(r.latencyMs, timeoutMs)}%`;
+  bar.title = `${r.outcome} \u00b7 ${r.latencyMs}ms`;
+  laneOutcomes.append(bar);
+
+  const state = r.breaker?.state ?? 'CLOSED';
+  const cell = document.createElement('div');
+  cell.className = `cell ${state}`;
+  cell.title = state;
+  laneState.append(cell);
+
+  while (laneOutcomes.childElementCount > HISTORY) laneOutcomes.firstElementChild.remove();
+  while (laneState.childElementCount > HISTORY) laneState.firstElementChild.remove();
 }
 
 function renderBreaker(b) {
