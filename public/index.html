@@ -40,19 +40,6 @@
 </section>
 
 <section class="panels">
-  <div class="panel" id="breaker-panel">
-    <h2>Breaker</h2>
-    <div class="state" id="state-badge">CLOSED</div>
-    <p class="reason" id="state-reason">&nbsp;</p>
-    <dl class="stats">
-      <div><dt>Consecutive failures</dt><dd id="stat-fails">0 / 5</dd></div>
-      <div><dt>Probe successes</dt><dd id="stat-successes">–</dd></div>
-      <div><dt>Reopens in</dt><dd id="stat-countdown">–</dd></div>
-      <div><dt>Call timeout</dt><dd id="stat-timeout">1000ms</dd></div>
-    </dl>
-    <button id="reset">Reset breaker</button>
-  </div>
-
   <div class="panel">
     <h2>Responses <span class="muted" id="window-note">(last 50)</span></h2>
     <dl class="stats">
@@ -64,6 +51,19 @@
       <div><dt>Calls reaching dep.</dt><dd id="c-reached">0</dd></div>
     </dl>
     <p class="last" id="last-response">&nbsp;</p>
+  </div>
+
+  <div class="panel" id="breaker-panel">
+    <h2>Breaker</h2>
+    <div class="state" id="state-badge">CLOSED</div>
+    <p class="reason" id="state-reason">&nbsp;</p>
+    <dl class="stats">
+      <div><dt>Consecutive failures</dt><dd id="stat-fails">0 / 5</dd></div>
+      <div><dt>Probe successes</dt><dd id="stat-successes">–</dd></div>
+      <div><dt>Reopens in</dt><dd id="stat-countdown">–</dd></div>
+      <div><dt>Call timeout</dt><dd id="stat-timeout">1000ms</dd></div>
+    </dl>
+    <button id="reset">Reset breaker</button>
   </div>
 
   <div class="panel">
