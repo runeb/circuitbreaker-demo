@@ -215,3 +215,30 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 .sw.band-CLOSED { background: #275f39; }
 .sw.band-HALF_OPEN { background: #7a5e18; }
 .sw.band-OPEN { background: #4f3382; }
+
+/* ---- status codes ---- */
+
+.status {
+  display: inline-block;
+  min-width: 34px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 600;
+  background: #21262d;
+  color: var(--muted);
+}
+.status.ok { color: var(--ok); }
+.status.err { color: var(--err); }
+.status.warn { color: var(--warn); }
+.status.rej { color: var(--rej); }
+
+/* The code each outcome maps to, beside its counter label. */
+.code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #21262d;
+  color: var(--muted);
+  font-size: 0.85em;
+  font-weight: 500;
+}

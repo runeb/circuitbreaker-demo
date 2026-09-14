@@ -26,7 +26,7 @@ async function fire() {
     const res = await fetch('/api/call');
     render(await res.json());
   } catch {
-    render({ ok: false, outcome: 'error', detail: 'network error', latencyMs: 0 });
+    render({ ok: false, outcome: 'error', status: 0, detail: 'network error', latencyMs: 0 });
   } finally {
     inFlight--;
   }
@@ -52,7 +52,10 @@ function render(r) {
     flash('edge-dep', tone);
   }
 
-  $('last-response').textContent = `${r.outcome.padEnd(9)} ${String(r.latencyMs).padStart(5)}ms  ${r.detail ?? ''}`;
+  $('last-status').textContent = r.status || '---';
+  $('last-status').className = `status ${tone}`;
+  $('last-response').textContent =
+    ` ${r.outcome.padEnd(9)} ${String(r.latencyMs).padStart(5)}ms  ${r.detail ?? ''}`;
 
   const window = recent.slice(-WINDOW);
   const counts = { success: 0, error: 0, timeout: 0, rejected: 0 };
@@ -88,7 +91,7 @@ function addTick(r) {
   const bar = document.createElement('div');
   bar.className = `tick ${TONE[r.outcome] ?? 'err'}`;
   bar.style.height = `${barHeight(r.latencyMs, timeoutMs)}%`;
-  bar.title = `${r.outcome} \u00b7 ${r.latencyMs}ms`;
+  bar.title = `${r.status ?? '---'} ${r.outcome} \u00b7 ${r.latencyMs}ms`;
   laneOutcomes.append(bar);
 
   const state = r.breaker?.state ?? 'CLOSED';

@@ -24,14 +24,27 @@ const app = express();
 app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
 
+/**
+ * Each outcome gets the status code it actually deserves, so the demo teaches
+ * the right vocabulary: 503 is us shedding load on purpose, and it is the only
+ * one of the three that says nothing about the dependency's health.
+ */
+const STATUS = {
+  success: 200,
+  error: 502, // Bad Gateway - the dependency answered badly
+  timeout: 504, // Gateway Timeout - the dependency was too slow
+  rejected: 503, // Service Unavailable - we never called it
+} as const;
+
 /** The client-facing endpoint the browser hammers. */
 app.get('/api/call', async (_req, res) => {
   const started = Date.now();
   try {
     const result = await breaker.call(() => dependency.call());
-    res.json({
+    res.status(STATUS.success).json({
       ok: true,
       outcome: 'success',
+      status: STATUS.success,
       detail: result.value,
       latencyMs: Date.now() - started,
       breaker: breaker.snapshot(),
@@ -41,13 +54,21 @@ app.get('/api/call', async (_req, res) => {
       err instanceof CircuitOpenError ? 'rejected'
       : err instanceof TimeoutError ? 'timeout'
       : 'error';
-    // A rejected call never reached the dependency: that's the breaker doing its job.
-    res.status(outcome === 'rejected' ? 503 : 502).json({
+    const breakerState = breaker.snapshot();
+
+    // A rejected call never reached the dependency: that's the breaker doing its
+    // job. Say when it's worth trying again, as a real shedding service would.
+    if (outcome === 'rejected' && breakerState.msUntilHalfOpen !== null) {
+      res.set('Retry-After', String(Math.ceil(breakerState.msUntilHalfOpen / 1000)));
+    }
+
+    res.status(STATUS[outcome]).json({
       ok: false,
       outcome,
+      status: STATUS[outcome],
       detail: err instanceof Error ? err.message : String(err),
       latencyMs: Date.now() - started,
-      breaker: breaker.snapshot(),
+      breaker: breakerState,
     });
   }
 });

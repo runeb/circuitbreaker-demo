@@ -60,14 +60,14 @@
   <div class="panel">
     <h2>Responses <span class="muted" id="window-note">(last 50)</span></h2>
     <dl class="stats">
-      <div><dt class="ok">Success</dt><dd id="c-success">0</dd></div>
-      <div><dt class="err">Error</dt><dd id="c-error">0</dd></div>
-      <div><dt class="warn">Timeout</dt><dd id="c-timeout">0</dd></div>
-      <div><dt class="rej">Rejected</dt><dd id="c-rejected">0</dd></div>
+      <div><dt class="ok">Success <code class="code">200</code></dt><dd id="c-success">0</dd></div>
+      <div><dt class="err">Error <code class="code">502</code></dt><dd id="c-error">0</dd></div>
+      <div><dt class="warn">Timeout <code class="code">504</code></dt><dd id="c-timeout">0</dd></div>
+      <div><dt class="rej">Rejected <code class="code">503</code></dt><dd id="c-rejected">0</dd></div>
       <div><dt>p50 latency</dt><dd id="c-latency">–</dd></div>
       <div><dt>Calls reaching dep.</dt><dd id="c-reached">0</dd></div>
     </dl>
-    <p class="last" id="last-response">&nbsp;</p>
+    <p class="last"><code class="status" id="last-status">&mdash;</code><span id="last-response"></span></p>
   </div>
 
   <div class="panel" id="breaker-panel">
