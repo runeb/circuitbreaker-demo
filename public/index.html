@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circuit Breaker Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Circuit breaker</h1>
+  <p>Your browser is calling <code>/api/call</code> continuously. Break the dependency and watch the breaker protect the API.</p>
+</header>
+
+<section class="graph">
+  <div class="node" id="node-browser">
+    <span class="node-label">Browser</span>
+    <span class="node-sub" id="browser-sub">idle</span>
+  </div>
+
+  <div class="edge" id="edge-client">
+    <div class="edge-line"></div>
+    <span class="edge-label" id="edge-client-label">request</span>
+  </div>
+
+  <div class="node" id="node-api">
+    <span class="node-label">API</span>
+    <span class="node-sub">express</span>
+  </div>
+
+  <div class="edge" id="edge-dep">
+    <div class="edge-line"></div>
+    <span class="edge-label"><span class="breaker-pip" id="breaker-pip"></span><span id="breaker-inline">CLOSED</span></span>
+  </div>
+
+  <div class="node" id="node-dep">
+    <span class="node-label">Dependency</span>
+    <span class="node-sub" id="dep-sub">healthy</span>
+  </div>
+</section>
+
+<section class="panels">
+  <div class="panel" id="breaker-panel">
+    <h2>Breaker</h2>
+    <div class="state" id="state-badge">CLOSED</div>
+    <p class="reason" id="state-reason">&nbsp;</p>
+    <dl class="stats">
+      <div><dt>Consecutive failures</dt><dd id="stat-fails">0 / 5</dd></div>
+      <div><dt>Probe successes</dt><dd id="stat-successes">–</dd></div>
+      <div><dt>Reopens in</dt><dd id="stat-countdown">–</dd></div>
+      <div><dt>Call timeout</dt><dd id="stat-timeout">1000ms</dd></div>
+    </dl>
+    <button id="reset">Reset breaker</button>
+  </div>
+
+  <div class="panel">
+    <h2>Responses <span class="muted" id="window-note">(last 50)</span></h2>
+    <dl class="stats">
+      <div><dt class="ok">Success</dt><dd id="c-success">0</dd></div>
+      <div><dt class="err">Error</dt><dd id="c-error">0</dd></div>
+      <div><dt class="warn">Timeout</dt><dd id="c-timeout">0</dd></div>
+      <div><dt class="rej">Rejected</dt><dd id="c-rejected">0</dd></div>
+      <div><dt>p50 latency</dt><dd id="c-latency">–</dd></div>
+      <div><dt>Calls reaching dep.</dt><dd id="c-reached">0</dd></div>
+    </dl>
+    <p class="last" id="last-response">&nbsp;</p>
+  </div>
+
+  <div class="panel">
+    <h2>Dependency controls</h2>
+    <label>Latency <output id="out-latency">20 ms</output>
+      <input type="range" id="in-latency" min="0" max="3000" step="10" value="20">
+    </label>
+    <label>Error rate <output id="out-error">0 %</output>
+      <input type="range" id="in-error" min="0" max="100" step="5" value="0">
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="in-down"> Take dependency down
+    </label>
+    <hr>
+    <label>Client request rate <output id="out-rate">8 /s</output>
+      <input type="range" id="in-rate" min="0" max="20" step="1" value="8">
+    </label>
+  </div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
