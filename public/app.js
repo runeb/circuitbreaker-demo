@@ -140,12 +140,46 @@ function flash(id, tone) {
 
 // ---- controls -----------------------------------------------------------
 
-async function pushDependency(patch) {
-  await fetch('/api/dependency', {
+/** Coalesce rapid changes into one request: a single slider drag emits dozens. */
+function throttle(fn, ms) {
+  let timer = null;
+  let last = 0;
+  return () => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      last = Date.now();
+      fn();
+    }, Math.max(0, ms - (Date.now() - last)));
+  };
+}
+
+let pendingPatch = {};
+
+const flushDependency = throttle(() => {
+  const patch = pendingPatch;
+  pendingPatch = {};
+  fetch('/api/dependency', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(patch),
   });
+}, 80);
+
+function pushDependency(patch) {
+  Object.assign(pendingPatch, patch);
+  flushDependency();
+}
+
+/** The server owns the dependency's health, so the controls start from it. */
+function syncControls(dep) {
+  const errorPercent = Math.round(dep.errorRate * 100);
+  $('in-latency').value = dep.latencyMs;
+  $('out-latency').textContent = `${dep.latencyMs} ms`;
+  $('in-error').value = errorPercent;
+  $('out-error').textContent = `${errorPercent} %`;
+  $('in-down').checked = dep.down;
+  describeDependency();
 }
 
 function describeDependency() {
@@ -193,5 +227,14 @@ setInterval(async () => {
   $('c-reached').textContent = s.callsReceived;
 }, 200);
 
-describeDependency();
+// Another tab (or a curl) may already have changed the dependency; don't show
+// hardcoded defaults that disagree with the server.
+fetch('/api/state')
+  .then((r) => r.json())
+  .then((s) => {
+    syncControls(s.dependency);
+    renderBreaker(s.breaker);
+  })
+  .catch(() => describeDependency());
+
 setRate(rate);
