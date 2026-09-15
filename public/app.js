@@ -160,7 +160,7 @@ function barHeight(ms, timeoutMs) {
 }
 
 function addTick(r) {
-  const timeoutMs = r.breaker?.config.timeoutMs ?? 1000;
+  const timeoutMs = r.breaker?.config.timeoutMs ?? 500;
   const bar = document.createElement('div');
   bar.className = `tick ${TONE[r.outcome] ?? 'err'}`;
   bar.style.height = `${barHeight(r.latencyMs, timeoutMs)}%`;

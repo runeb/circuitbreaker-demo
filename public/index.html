@@ -79,7 +79,7 @@
       <div><dt>Consecutive failures</dt><dd id="stat-fails">0 / 5</dd></div>
       <div><dt>Probe successes</dt><dd id="stat-successes">–</dd></div>
       <div><dt>Half-open in</dt><dd id="stat-countdown">–</dd></div>
-      <div><dt>Call timeout</dt><dd id="stat-timeout">1000 ms</dd></div>
+      <div><dt>Call timeout</dt><dd id="stat-timeout">500 ms</dd></div>
     </dl>
     <button id="reset">Reset breaker</button>
   </div>
@@ -87,7 +87,7 @@
   <div class="panel" id="controls">
     <h2>Dependency controls</h2>
     <label>Latency <output id="out-latency">20 ms</output>
-      <input type="range" id="in-latency" min="0" max="3000" step="10" value="20">
+      <input type="range" id="in-latency" min="0" max="600" step="10" value="20">
     </label>
     <label>Error rate <output id="out-error">0 %</output>
       <input type="range" id="in-error" min="0" max="100" step="5" value="0">

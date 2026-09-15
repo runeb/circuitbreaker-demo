@@ -73,7 +73,7 @@ machine as the only thing in it. Defaults:
 | `openMs` | 6000 | how long it stays open before probing |
 | `successesToClose` | 3 | probes that must succeed to close it |
 | `halfOpenMaxProbes` | 2 | probes allowed in flight at once |
-| `timeoutMs` | 1000 | a call slower than this counts as a failure |
+| `timeoutMs` | 500 | a call slower than this counts as a failure |
 
 Its invariants are covered in [`src/breaker.test.ts`](src/breaker.test.ts).
 

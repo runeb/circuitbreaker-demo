@@ -27,7 +27,7 @@ export const DEFAULT_CONFIG: BreakerConfig = {
   openMs: 6000,
   successesToClose: 3,
   halfOpenMaxProbes: 2,
-  timeoutMs: 1000,
+  timeoutMs: 500,
 };
 
 /** Thrown instead of calling the dependency when the breaker is not letting calls through. */
