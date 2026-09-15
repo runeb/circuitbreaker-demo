@@ -3,7 +3,8 @@
   --panel: #161b22;
   --line: #2a313c;
   --text: #d8dee9;
-  --muted: #8b949e;
+  --muted: #98a2b1;      /* labels and single words */
+  --text-soft: #bcc6d4;  /* prose - needs more contrast than a label does */
   --ok: #3fb950;
   --err: #f85149;
   --warn: #d29922;
@@ -28,8 +29,7 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 /* Kept deliberately tight: the whole demo has to stay above the fold. */
 .lede {
   margin: 0 0 14px;
-  max-width: 78ch;
-  color: var(--muted);
+  color: var(--text-soft);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -48,7 +48,7 @@ h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 .try li {
   position: relative;
   padding-left: 24px;
-  color: var(--muted);
+  color: var(--text-soft);
   font-size: 12px;
   line-height: 1.5;
   counter-increment: step;
@@ -190,7 +190,7 @@ dt.dead { color: var(--dead); }
   border-top: 1px solid var(--line);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-soft);
   min-height: 18px;
 }
 
@@ -305,7 +305,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
-  color: var(--muted);
+  color: var(--text-soft);
   font-size: 13px;
   line-height: 1.65;
 }
