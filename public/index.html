@@ -13,11 +13,11 @@
     A failing dependency is bad. A <em>slow</em> failing one is worse: every call sits
     waiting for a timeout, requests pile up behind it, and a service that was perfectly
     healthy falls over because something it depends on did. A circuit breaker counts the
-    failures and, past a threshold, stops calling for a while &mdash; failing instantly
-    instead of slowly, and leaving the dependency room to recover.
+    failures and, past a threshold, stops calling for a while. Callers fail instantly
+    instead of slowly, and the dependency gets room to recover.
   </p>
   <ol class="try">
-    <li><strong>Break the dependency</strong> with the controls on the right &mdash; add
+    <li><strong>Break the dependency</strong> with the controls on the right. Add
       errors or latency, or take it down entirely.</li>
     <li><strong>Watch the breaker trip</strong> to OPEN. Calls stop reaching the
       dependency and start failing instantly instead.</li>
@@ -54,7 +54,7 @@
 </section>
 
 <section class="panel timeline">
-  <h2>Timeline <span class="muted">one bar per response, newest on the right — bar height is latency</span></h2>
+  <h2>Timeline <span class="muted">one bar per response, newest on the right; bar height is latency</span></h2>
   <div class="lane" id="lane-outcomes"></div>
   <div class="lane-state" id="lane-state"></div>
   <div class="legend">
@@ -82,7 +82,7 @@
       <div><dt>p50 latency</dt><dd id="c-latency">–</dd></div>
       <div><dt>Calls reaching dep.</dt><dd id="c-reached">0</dd></div>
     </dl>
-    <p class="last"><code class="status" id="last-status">&mdash;</code><span id="last-response"></span></p>
+    <p class="last"><code class="status" id="last-status">---</code><span id="last-response"></span></p>
   </div>
 
   <div class="panel" id="breaker-panel">
@@ -137,7 +137,7 @@
 
   <div class="panel">
     <h2>Why this matters</h2>
-    <p>In a distributed system the danger isn't one service failing &mdash; it's the
+    <p>In a distributed system, one service failing is survivable. The danger is that
       failure spreading. Callers blocked on a dead dependency hold connections and
       memory, so they stop answering their own callers, who then block too. One slow
       database can take down a dozen services that never touched it.</p>
@@ -145,9 +145,9 @@
       dependency: a service struggling under load recovers much faster if you stop
       hammering it, which is what the cooldown is for.</p>
     <p>The cost is honesty about uncertainty. While the breaker is open nobody knows
-      whether the dependency is healthy, because nobody is asking &mdash; which is why
-      <code>503</code> means "we didn't call it", not "it's broken". The probes in
-      HALF-OPEN are how it finds out again, cheaply.</p>
+      whether the dependency is healthy, because nobody is asking. That is what
+      <code>503</code> reports here: we didn't call it. The probes in HALF-OPEN are how
+      the breaker finds out again, cheaply.</p>
   </div>
 </section>
 
