@@ -298,27 +298,19 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 
 /* ---- explainer (below the fold, for anyone who wants the detail) ---- */
 
+/* Same cards as the demo above, so this reads as part of the page. */
 .explainer {
   max-width: 1100px;
-  margin: 40px auto 0;
-  padding-top: 28px;
-  border-top: 1px solid var(--line);
+  margin: 16px auto 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px 48px;
+  gap: 16px;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.65;
 }
-.explainer h2 {
-  margin: 0 0 12px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.explainer p { margin: 0 0 10px; max-width: 62ch; }
+.explainer p { margin: 0 0 10px; }
+.explainer p:last-of-type { margin-bottom: 0; }
 .explainer dl { margin: 0; }
 .explainer dt {
   margin-top: 10px;
@@ -327,7 +319,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
   letter-spacing: 0.04em;
 }
 .explainer dt:first-child { margin-top: 0; }
-.explainer dd { margin: 2px 0 0; max-width: 62ch; }
+.explainer dd { margin: 2px 0 0; }
 .explainer dt.s-closed { color: var(--ok); }
 .explainer dt.s-open { color: var(--rej); }
 .explainer dt.s-half { color: var(--warn); }
