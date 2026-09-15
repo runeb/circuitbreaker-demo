@@ -48,6 +48,21 @@ const app = express();
 app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
 
+/**
+ * Every API response is a fresh observation; none of it is reusable.
+ *
+ * Saying so matters more than it looks. Without it the browser treats
+ * concurrent GETs to the same URL as candidates for the same cache entry and
+ * serialises them, waiting to see whether the first response can satisfy the
+ * rest. With a slow dependency that turns the demo's parallel request stream
+ * into a queue: at 940ms latency, six calls took 5.7s instead of 1s, the state
+ * polls stalled behind them, and the countdown visibly stuttered.
+ */
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 /** The client-facing endpoint the browser hammers. */
 app.get('/api/call', async (req, res) => {
   const { breaker, dependency } = sessionFor(req);

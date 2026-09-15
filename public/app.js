@@ -6,6 +6,13 @@ const SESSION_ID = crypto.randomUUID();
 
 function api(path, options = {}) {
   return fetch(path, {
+    // Not an optimisation - a correctness fix for the demo. Browsers serialise
+    // concurrent GETs to an identical URL while they wait to see whether the
+    // first response can satisfy the rest, and a response-side Cache-Control
+    // cannot prevent it because the lock is taken before any response arrives.
+    // Without this the request stream degenerates into a queue the moment the
+    // dependency is slow: at 940ms latency, six calls took 5.7s instead of 1s.
+    cache: 'no-store',
     ...options,
     headers: { ...options.headers, 'x-demo-session': SESSION_ID },
   });
@@ -15,9 +22,24 @@ const WINDOW = 50;    // responses summarised by the counters
 const HISTORY = 220;  // bars kept on the timeline
 const recent = [];    // { outcome, latencyMs, breaker }
 
-let rate = 8;          // requests per second
+/**
+ * Browsers allow 6 concurrent connections per host over HTTP/1.1, shared by
+ * every request this page makes - measured here as exactly 6, with a 7th call
+ * waiting for the first batch to finish.
+ *
+ * Staying under that keeps the demo honest. Hand the browser more and the
+ * surplus queues, the 200ms state polls end up behind slow /api/call requests,
+ * and the countdown stutters - jank that looks like the server struggling when
+ * it is the client's own connection pool. Four leaves two connections free for
+ * polls and control changes.
+ */
+const MAX_IN_FLIGHT = 4;
+
+let rate = 8;          // requests per second the loop aims for
 let timer = null;
 let inFlight = 0;
+const completions = []; // recent response times, for the rate actually achieved
+const skips = [];       // recent firings the cap turned away
 
 // ---- request loop -------------------------------------------------------
 
@@ -25,16 +47,42 @@ function setRate(next) {
   rate = next;
   if (timer) clearInterval(timer);
   timer = null;
-  $('browser-sub').textContent = rate === 0 ? 'paused' : `${rate} req/s`;
+  showRate();
   if (rate > 0) timer = setInterval(fire, 1000 / rate);
 }
 
+/**
+ * A slow dependency means fewer requests fit in the connection budget, so the
+ * loop can't reach the rate you asked for. Say so rather than claiming a rate
+ * the page isn't achieving.
+ */
+function showRate() {
+  const label = $('browser-sub');
+  if (rate === 0) {
+    label.textContent = 'paused';
+    label.title = '';
+    return;
+  }
+  const now = Date.now();
+  while (completions.length && now - completions[0] > 1000) completions.shift();
+  while (skips.length && now - skips[0] > 1000) skips.shift();
+
+  // Whether the loop wanted to fire and couldn't - not whether the cap happens
+  // to be full right now, which is never true just after a call returns.
+  const achieved = completions.length;
+  const limited = skips.length > 0;
+  label.textContent = limited ? `${achieved} of ${rate} req/s` : `${rate} req/s`;
+  label.title = limited
+    ? `Capped at ${MAX_IN_FLIGHT} requests in flight to stay inside the browser's connection limit`
+    : '';
+}
+
 async function fire() {
-  // Don't let a slow dependency build an unbounded queue in the browser. Note
-  // this is rarely the real limit: browsers allow ~6 connections per host over
-  // HTTP/1.1, so a slow dependency queues requests - including the state polls -
-  // well before this cap is reached.
-  if (inFlight >= 20) return;
+  if (inFlight >= MAX_IN_FLIGHT) {
+    skips.push(Date.now());
+    showRate();
+    return;
+  }
   inFlight++;
   try {
     const res = await api('/api/call');
@@ -47,6 +95,8 @@ async function fire() {
     render({ ok: false, outcome: 'unreachable', status: 0, detail: 'no response from API', latencyMs: 0 });
   } finally {
     inFlight--;
+    completions.push(Date.now());
+    showRate();
   }
 }
 
