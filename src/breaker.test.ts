@@ -222,6 +222,111 @@ describe('HALF_OPEN', () => {
   });
 });
 
+describe('calls that outlive the state that admitted them', () => {
+  it('does not count a failure that lands after the breaker already tripped', async () => {
+    const stale = controlled();
+    const inFlight = breaker.call(stale.fn);
+
+    await trip();
+    const before = breaker.snapshot();
+
+    stale.reject(new Error('late'));
+    await expect(inFlight).rejects.toThrow('late');
+
+    const after = breaker.snapshot();
+    expect(after.consecutiveFailures).toBe(before.consecutiveFailures);
+    expect(after.consecutiveFailures).toBe(CONFIG.failureThreshold);
+  });
+
+  it('does not let a stale failure push the count past the threshold', async () => {
+    const stale = [controlled(), controlled(), controlled()];
+    const inFlight = stale.map((c) => breaker.call(c.fn).catch(() => {}));
+
+    await trip();
+    stale.forEach((c) => c.reject(new Error('late')));
+    await Promise.all(inFlight);
+
+    // The panel reads "N / threshold"; N climbing past the threshold is nonsense.
+    expect(breaker.snapshot().consecutiveFailures).toBe(CONFIG.failureThreshold);
+  });
+
+  it('does not let a stale failure restart the cooldown', async () => {
+    const stale = controlled();
+    const inFlight = breaker.call(stale.fn).catch(() => {});
+
+    await trip();
+    await vi.advanceTimersByTimeAsync(CONFIG.openMs / 2);
+    const remaining = breaker.snapshot().msUntilHalfOpen;
+
+    stale.reject(new Error('late'));
+    await inFlight;
+
+    expect(breaker.snapshot().msUntilHalfOpen).toBe(remaining);
+  });
+
+  it('does not let a stale success clear the failures that tripped it', async () => {
+    const stale = controlled();
+    const inFlight = breaker.call(stale.fn);
+
+    await trip();
+    stale.resolve('late');
+    await expect(inFlight).resolves.toBe('late');
+
+    const s = breaker.snapshot();
+    expect(s.state).toBe('OPEN');
+    expect(s.consecutiveFailures).toBe(CONFIG.failureThreshold);
+  });
+
+  it('ignores a probe that succeeds after a sibling probe re-opened the breaker', async () => {
+    await trip();
+    await coolDown();
+
+    const winner = controlled();
+    const loser = controlled();
+    const probeA = breaker.call(winner.fn);
+    const probeB = breaker.call(loser.fn);
+
+    loser.reject(new Error('boom'));
+    await expect(probeB).rejects.toThrow('boom');
+    expect(breaker.snapshot().state).toBe('OPEN');
+
+    winner.resolve('ok');
+    await expect(probeA).resolves.toBe('ok');
+
+    const s = breaker.snapshot();
+    expect(s.state).toBe('OPEN');
+    expect(s.consecutiveSuccesses).toBe(0);
+  });
+
+  it('keeps a stale probe out of the next half-open window', async () => {
+    // A cooldown shorter than the call timeout lets a probe outlive its own
+    // window entirely, so its result can arrive during a later one.
+    const shortCooldown = new CircuitBreaker({ ...CONFIG, openMs: 200, timeoutMs: 5000 });
+    const fail = fails();
+    for (let i = 0; i < CONFIG.failureThreshold; i++) {
+      await expect(shortCooldown.call(fail)).rejects.toThrow();
+    }
+
+    await vi.advanceTimersByTimeAsync(200);
+    expect(shortCooldown.snapshot().state).toBe('HALF_OPEN');
+
+    const orphan = controlled();
+    const probe = shortCooldown.call(orphan.fn).catch(() => {});
+
+    // Its window ends: a sibling probe fails, and a fresh cooldown elapses.
+    await expect(shortCooldown.call(fail)).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(shortCooldown.snapshot().state).toBe('HALF_OPEN');
+
+    orphan.resolve('ok');
+    await probe;
+
+    // Counting it here would be one success toward closing a window it never ran in.
+    expect(shortCooldown.snapshot().consecutiveSuccesses).toBe(0);
+    expect(shortCooldown.snapshot().state).toBe('HALF_OPEN');
+  });
+});
+
 describe('reset', () => {
   it('forces an OPEN breaker closed and clears the counters', async () => {
     await trip();

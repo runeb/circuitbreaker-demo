@@ -70,6 +70,7 @@ export class CircuitBreaker {
   #consecutiveSuccesses = 0;
   #probesInFlight = 0;
   #openedAt = 0;
+  #generation = 0;
   #lastTransition: Transition | null = null;
 
   constructor(config: BreakerConfig = DEFAULT_CONFIG) {
@@ -90,12 +91,14 @@ export class CircuitBreaker {
       this.#probesInFlight++;
     }
 
+    const admittedIn = this.#generation;
+
     try {
       const result = await this.#withTimeout(fn());
-      this.#onSuccess();
+      this.#settle(admittedIn, true);
       return result;
     } catch (err) {
-      this.#onFailure();
+      this.#settle(admittedIn, false);
       throw err;
     } finally {
       if (isProbe) this.#probesInFlight = Math.max(0, this.#probesInFlight - 1);
@@ -147,6 +150,20 @@ export class CircuitBreaker {
     }
   }
 
+  /**
+   * Apply a result only if the breaker is still in the state that admitted the
+   * call. A slow call can outlive the state it started in - it can even outlive
+   * a whole OPEN period when the cooldown is shorter than the call timeout - and
+   * counting it then is never right: it would report failures beyond the
+   * threshold that tripped the breaker, or let a probe from one HALF_OPEN window
+   * count toward closing the next one.
+   */
+  #settle(admittedIn: number, succeeded: boolean): void {
+    if (admittedIn !== this.#generation) return;
+    if (succeeded) this.#onSuccess();
+    else this.#onFailure();
+  }
+
   #onSuccess(): void {
     this.#consecutiveFailures = 0;
     this.#consecutiveSuccesses++;
@@ -180,6 +197,7 @@ export class CircuitBreaker {
     const transition: Transition = { from: this.#state, to, reason, at: Date.now() };
     this.#lastTransition = transition;
     this.#state = to;
+    this.#generation++;
     this.onTransition?.(transition);
   }
 }
