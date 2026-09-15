@@ -255,7 +255,8 @@ describe('calls that outlive the state that admitted them', () => {
     const inFlight = breaker.call(stale.fn).catch(() => {});
 
     await trip();
-    await vi.advanceTimersByTimeAsync(CONFIG.openMs / 2);
+    // Stay inside the call timeout so the rejection below is what settles it.
+    await vi.advanceTimersByTimeAsync(CONFIG.timeoutMs / 2);
     const remaining = breaker.snapshot().msUntilHalfOpen;
 
     stale.reject(new Error('late'));
@@ -296,6 +297,81 @@ describe('calls that outlive the state that admitted them', () => {
     const s = breaker.snapshot();
     expect(s.state).toBe('OPEN');
     expect(s.consecutiveSuccesses).toBe(0);
+  });
+
+  it('does not let a stale probe free a slot in a later window', async () => {
+    // A cooldown shorter than the call timeout lets a probe outlive its window,
+    // so its slot release can land while a later window is using the slots.
+    const shortCooldown = new CircuitBreaker({ ...CONFIG, openMs: 200, timeoutMs: 5000 });
+    const fail = fails();
+    for (let i = 0; i < CONFIG.failureThreshold; i++) {
+      await expect(shortCooldown.call(fail)).rejects.toThrow();
+    }
+
+    await vi.advanceTimersByTimeAsync(200);
+    const orphan = controlled();
+    const orphaned = shortCooldown.call(orphan.fn).catch(() => {});
+
+    // End that window and open a fresh one, then fill it.
+    await expect(shortCooldown.call(fail)).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(200);
+    const current = Array.from({ length: CONFIG.halfOpenMaxProbes }, () => controlled());
+    const inFlight = current.map((p) => shortCooldown.call(p.fn));
+    expect(shortCooldown.snapshot().probesInFlight).toBe(CONFIG.halfOpenMaxProbes);
+
+    orphan.resolve('late');
+    await orphaned;
+
+    // The orphan's slot was never this window's to give back.
+    expect(shortCooldown.snapshot().probesInFlight).toBe(CONFIG.halfOpenMaxProbes);
+    const overflow = ok();
+    await expect(shortCooldown.call(overflow)).rejects.toBeInstanceOf(CircuitOpenError);
+    expect(overflow).not.toHaveBeenCalled();
+
+    current.forEach((p) => p.resolve('ok'));
+    await Promise.all(inFlight);
+  });
+
+  it('ignores a call that settles after a full round trip back to CLOSED', async () => {
+    // Its timeout has to outlive the cooldown, or the call settles while OPEN
+    // and never reaches the round trip this test is about.
+    const patient = new CircuitBreaker({ ...CONFIG, timeoutMs: CONFIG.openMs * 10 });
+    const stale = controlled();
+    const inFlight = patient.call(stale.fn).catch(() => {});
+
+    const fail = fails();
+    for (let i = 0; i < CONFIG.failureThreshold; i++) {
+      await expect(patient.call(fail)).rejects.toThrow();
+    }
+    await vi.advanceTimersByTimeAsync(CONFIG.openMs);
+    for (let i = 0; i < CONFIG.successesToClose; i++) {
+      await expect(patient.call(ok())).resolves.toBe('ok');
+    }
+    expect(patient.snapshot().state).toBe('CLOSED');
+
+    // Same state name, but a different epoch: those probes closed the breaker on
+    // newer evidence than this call, which was admitted before the outage.
+    stale.reject(new Error('late'));
+    await inFlight;
+
+    expect(patient.snapshot().consecutiveFailures).toBe(0);
+    expect(patient.snapshot().state).toBe('CLOSED');
+  });
+
+  it('leaves no probe slots held once a window closes the breaker', async () => {
+    await trip();
+    await coolDown();
+
+    const probe = controlled();
+    const inFlight = breaker.call(probe.fn);
+    for (let i = 0; i < CONFIG.successesToClose; i++) {
+      await expect(breaker.call(ok())).resolves.toBe('ok');
+    }
+    expect(breaker.snapshot().state).toBe('CLOSED');
+
+    probe.resolve('ok');
+    await inFlight;
+    expect(breaker.snapshot().probesInFlight).toBe(0);
   });
 
   it('keeps a stale probe out of the next half-open window', async () => {

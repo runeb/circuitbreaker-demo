@@ -91,17 +91,21 @@ export class CircuitBreaker {
       this.#probesInFlight++;
     }
 
-    const admittedIn = this.#generation;
+    const admittedGeneration = this.#generation;
 
     try {
       const result = await this.#withTimeout(fn());
-      this.#settle(admittedIn, true);
+      this.#settle(admittedGeneration, true);
       return result;
     } catch (err) {
-      this.#settle(admittedIn, false);
+      this.#settle(admittedGeneration, false);
       throw err;
     } finally {
-      if (isProbe) this.#probesInFlight = Math.max(0, this.#probesInFlight - 1);
+      // A slot belongs to the generation that took it. Releasing it later would
+      // free a slot in whatever window is running now, letting an extra probe
+      // past halfOpenMaxProbes; the transition out of that window already
+      // released every slot it held.
+      if (isProbe && admittedGeneration === this.#generation) this.#probesInFlight--;
     }
   }
 
@@ -145,21 +149,24 @@ export class CircuitBreaker {
   #refresh(): void {
     if (this.#state === 'OPEN' && Date.now() - this.#openedAt >= this.config.openMs) {
       this.#consecutiveSuccesses = 0;
-      this.#probesInFlight = 0;
       this.#transition('HALF_OPEN', `${this.config.openMs}ms cooldown elapsed`);
     }
   }
 
   /**
-   * Apply a result only if the breaker is still in the state that admitted the
-   * call. A slow call can outlive the state it started in - it can even outlive
-   * a whole OPEN period when the cooldown is shorter than the call timeout - and
-   * counting it then is never right: it would report failures beyond the
-   * threshold that tripped the breaker, or let a probe from one HALF_OPEN window
-   * count toward closing the next one.
+   * Apply a result only if no transition has happened since the call was
+   * admitted - deliberately stricter than "the breaker is in the same state".
+   * A transition is the breaker changing its mind, so a result from before one
+   * is evidence about a decision already made on newer information. That holds
+   * even when the state name matches again after a full CLOSED -> OPEN ->
+   * HALF_OPEN -> CLOSED round trip: those probes closed the breaker, and a
+   * failure predating the outage should not count against them.
+   *
+   * A slow call can outlive its window entirely when the cooldown is shorter
+   * than the call timeout, which is when this stops being cosmetic.
    */
-  #settle(admittedIn: number, succeeded: boolean): void {
-    if (admittedIn !== this.#generation) return;
+  #settle(admittedGeneration: number, succeeded: boolean): void {
+    if (admittedGeneration !== this.#generation) return;
     if (succeeded) this.#onSuccess();
     else this.#onFailure();
   }
@@ -188,7 +195,6 @@ export class CircuitBreaker {
 
   #open(reason: string): void {
     this.#openedAt = Date.now();
-    this.#probesInFlight = 0;
     this.#transition('OPEN', reason);
   }
 
@@ -198,6 +204,8 @@ export class CircuitBreaker {
     this.#lastTransition = transition;
     this.#state = to;
     this.#generation++;
+    // Probe slots belong to the window that just ended, whichever way we left it.
+    this.#probesInFlight = 0;
     this.onTransition?.(transition);
   }
 }
