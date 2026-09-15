@@ -22,9 +22,53 @@ body {
   font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
 }
 
-header { max-width: 1100px; margin: 0 auto 32px; }
-h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-header p { margin: 0; color: var(--muted); }
+header { max-width: 1100px; margin: 0 auto 24px; }
+h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+
+/* Kept deliberately tight: the whole demo has to stay above the fold. */
+.lede {
+  margin: 0 0 14px;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.lede em { color: var(--text); font-style: italic; }
+
+/* Three steps reading left to right, like the graph below them. */
+.try {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px 20px;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+  list-style: none;
+}
+.try li {
+  position: relative;
+  padding-left: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  counter-increment: step;
+}
+.try li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: center;
+}
+.try strong { color: var(--text); font-weight: 600; }
 code { background: #21262d; padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
 
 /* ---- graph ---- */
@@ -250,4 +294,46 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
   color: var(--muted);
   font-size: 0.85em;
   font-weight: 500;
+}
+
+/* ---- explainer (below the fold, for anyone who wants the detail) ---- */
+
+.explainer {
+  max-width: 1100px;
+  margin: 40px auto 0;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px 48px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.explainer h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.explainer p { margin: 0 0 10px; max-width: 62ch; }
+.explainer dl { margin: 0; }
+.explainer dt {
+  margin-top: 10px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.explainer dt:first-child { margin-top: 0; }
+.explainer dd { margin: 2px 0 0; max-width: 62ch; }
+.explainer dt.s-closed { color: var(--ok); }
+.explainer dt.s-open { color: var(--rej); }
+.explainer dt.s-half { color: var(--warn); }
+.explainer .note {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
 }

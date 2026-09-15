@@ -9,7 +9,21 @@
 <body>
 <header>
   <h1>Circuit breaker</h1>
-  <p>Your browser is calling <code>/api/call</code> continuously. Break the dependency and watch the breaker protect the API.</p>
+  <p class="lede">
+    A failing dependency is bad. A <em>slow</em> failing one is worse: every call sits
+    waiting for a timeout, requests pile up behind it, and a service that was perfectly
+    healthy falls over because something it depends on did. A circuit breaker counts the
+    failures and, past a threshold, stops calling for a while &mdash; failing instantly
+    instead of slowly, and leaving the dependency room to recover.
+  </p>
+  <ol class="try">
+    <li><strong>Break the dependency</strong> with the controls on the right &mdash; add
+      errors or latency, or take it down entirely.</li>
+    <li><strong>Watch the breaker trip</strong> to OPEN. Calls stop reaching the
+      dependency and start failing instantly instead.</li>
+    <li><strong>Make it healthy again</strong> and watch HALF-OPEN send a few probes
+      before it trusts the dependency enough to close.</li>
+  </ol>
 </header>
 
 <section class="graph">
@@ -99,6 +113,41 @@
     <label>Client request rate <output id="out-rate">8 /s</output>
       <input type="range" id="in-rate" min="0" max="12" step="1" value="8">
     </label>
+  </div>
+</section>
+
+<section class="explainer">
+  <div>
+    <h2>The three states</h2>
+    <dl>
+      <dt class="s-closed">CLOSED</dt>
+      <dd>Normal service. Calls go through, and consecutive failures are counted. Enough
+        of them in a row trips the breaker.</dd>
+      <dt class="s-open">OPEN</dt>
+      <dd>Nothing reaches the dependency. Every call fails immediately with
+        <code>503</code>, so callers get an answer in microseconds instead of waiting on
+        a timeout that was going to fail anyway.</dd>
+      <dt class="s-half">HALF-OPEN</dt>
+      <dd>After a cooldown, a couple of probes are allowed through to test the water. Enough
+        successes and it closes; a single failure and it opens again for another cooldown.</dd>
+    </dl>
+    <p class="note">The Breaker panel shows the thresholds this demo is using, and why it
+      last changed state.</p>
+  </div>
+
+  <div>
+    <h2>Why this matters</h2>
+    <p>In a distributed system the danger isn't one service failing &mdash; it's the
+      failure spreading. Callers blocked on a dead dependency hold connections and
+      memory, so they stop answering their own callers, who then block too. One slow
+      database can take down a dozen services that never touched it.</p>
+    <p>Breaking the circuit stops that spread at the first hop. It also helps the
+      dependency: a service struggling under load recovers much faster if you stop
+      hammering it, which is what the cooldown is for.</p>
+    <p>The cost is honesty about uncertainty. While the breaker is open nobody knows
+      whether the dependency is healthy, because nobody is asking &mdash; which is why
+      <code>503</code> means "we didn't call it", not "it's broken". The probes in
+      HALF-OPEN are how it finds out again, cheaply.</p>
   </div>
 </section>
 
