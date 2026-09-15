@@ -98,6 +98,17 @@ drops a session five minutes after its last request. Reloading starts a clean de
 and a second tab is an independent one — useful for running two configurations side
 by side.
 
+### Run it on one instance
+
+All of that state lives in memory, so this must run as a **single, always-on
+process**. Serverless resets it between invocations, and two replicas would
+round-robin a viewer between two different breakers — the exact confusion the
+session store exists to prevent. No scale-to-zero, no autoscaling.
+
+Making it survive that (shared store, sticky sessions) is deliberately out of
+scope: it would add infrastructure that teaches nothing about circuit breakers,
+which is the only thing this is for.
+
 ## API
 
 | | |
