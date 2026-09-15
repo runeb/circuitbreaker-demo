@@ -9,7 +9,6 @@
   --err: #f85149;
   --warn: #d29922;
   --rej: #a371f7;
-  --dead: #6e7681;
   --accent: #58a6ff;
 }
 
@@ -100,7 +99,6 @@ code { background: #21262d; padding: 1px 5px; border-radius: 4px; font-size: 0.9
 .node.pulse-err { border-color: var(--err); box-shadow: 0 0 0 1px var(--err) inset; }
 .node.pulse-warn { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn) inset; }
 .node.pulse-rej { border-color: var(--rej); box-shadow: 0 0 0 1px var(--rej) inset; }
-.node.pulse-dead { border-color: var(--dead); box-shadow: 0 0 0 1px var(--dead) inset; }
 
 .edge {
   display: flex;
@@ -119,7 +117,6 @@ code { background: #21262d; padding: 1px 5px; border-radius: 4px; font-size: 0.9
 .edge.flow-warn .edge-line { background: var(--warn); }
 /* Rejected requests still travel browser -> API; only the far edge is cut. */
 .edge.flow-rej .edge-line { background: var(--rej); }
-.edge.flow-dead .edge-line { background: var(--dead); }
 .edge.cut .edge-line {
   background: repeating-linear-gradient(90deg, var(--rej) 0 6px, transparent 6px 12px);
 }
@@ -182,7 +179,6 @@ code { background: #21262d; padding: 1px 5px; border-radius: 4px; font-size: 0.9
 .stats dd { margin: 0; font-variant-numeric: tabular-nums; }
 dt.ok { color: var(--ok); } dt.err { color: var(--err); }
 dt.warn { color: var(--warn); } dt.rej { color: var(--rej); }
-dt.dead { color: var(--dead); }
 
 .last {
   margin: 14px 0 0;
@@ -232,7 +228,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 .tick.err { background: var(--err); }
 .tick.warn { background: var(--warn); }
 .tick.rej { background: var(--rej); }
-.tick.dead { background: var(--dead); }
 
 /* One cell per bar above it, so the state band lines up with the responses. */
 .lane-state {
@@ -247,7 +242,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 .cell.CLOSED { background: #275f39; }
 .cell.HALF_OPEN { background: #7a5e18; }
 .cell.OPEN { background: #4f3382; }
-.cell.UNKNOWN { background: #30363d; }
 
 .legend {
   display: flex;
@@ -284,7 +278,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 .status.err { color: var(--err); }
 .status.warn { color: var(--warn); }
 .status.rej { color: var(--rej); }
-.status.dead { color: var(--dead); }
 
 /* The code each outcome maps to, beside its counter label. */
 .code {

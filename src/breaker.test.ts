@@ -419,25 +419,3 @@ describe('reset', () => {
     expect(fn).toHaveBeenCalledOnce();
   });
 });
-
-describe('transitions', () => {
-  it('notifies onTransition exactly once per state change', async () => {
-    const seen: string[] = [];
-    breaker.onTransition = (t) => seen.push(`${t.from}->${t.to}`);
-
-    await trip();
-    await coolDown();
-    for (let i = 0; i < CONFIG.successesToClose; i++) await breaker.call(ok());
-
-    expect(seen).toEqual(['CLOSED->OPEN', 'OPEN->HALF_OPEN', 'HALF_OPEN->CLOSED']);
-  });
-
-  it('does not fire while the state is unchanged', async () => {
-    const onTransition = vi.fn();
-    breaker.onTransition = onTransition;
-
-    await breaker.call(ok());
-    await expect(breaker.call(fails())).rejects.toThrow();
-    expect(onTransition).not.toHaveBeenCalled();
-  });
-});

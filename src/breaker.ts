@@ -62,9 +62,6 @@ export type Transition = { from: BreakerState; to: BreakerState; reason: string;
 export class CircuitBreaker {
   config: BreakerConfig;
 
-  /** Called on every state change, so the caller can log or emit metrics. */
-  onTransition?: (t: Transition) => void;
-
   #state: BreakerState = 'CLOSED';
   #consecutiveFailures = 0;
   #consecutiveSuccesses = 0;
@@ -134,7 +131,7 @@ export class CircuitBreaker {
 
   async #withTimeout<T>(promise: Promise<T>): Promise<T> {
     const { timeoutMs } = this.config;
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new TimeoutError(timeoutMs)), timeoutMs);
     });
@@ -206,6 +203,5 @@ export class CircuitBreaker {
     this.#generation++;
     // Probe slots belong to the window that just ended, whichever way we left it.
     this.#probesInFlight = 0;
-    this.onTransition?.(transition);
   }
 }

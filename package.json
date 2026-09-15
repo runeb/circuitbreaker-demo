@@ -4,21 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node src/server.ts",
-    "dev": "node --watch src/server.ts",
+    "build": "esbuild src/app.ts --bundle --outfile=public/bundle.js --format=iife --target=es2022 --minify",
+    "dev": "esbuild src/app.ts --bundle --outfile=public/bundle.js --format=iife --target=es2022 --servedir=public --watch=forever",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "dependencies": {
-    "express": "^5.1.0",
-    "pino": "^10.3.1"
-  },
   "devDependencies": {
-    "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.0"
-  },
-  "engines": {
-    "node": ">=24"
   }
 }

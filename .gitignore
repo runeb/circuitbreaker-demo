@@ -1,6 +1,9 @@
 # dependencies
 node_modules/
 
+# build output
+public/bundle.js
+
 # build & test output
 dist/
 coverage/
