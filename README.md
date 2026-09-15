@@ -58,8 +58,9 @@ Each outcome gets the status code it deserves:
 
 `503` is the interesting one: it is the only code here that says nothing about the
 dependency's health, because while the breaker is open we have no current
-information about it. Those responses also carry `Retry-After`, derived from the
-breaker's own countdown.
+information about it. While the breaker is open those responses also carry
+`Retry-After`, derived from its own countdown; the few rejected because a
+half-open window already has its probes carry no countdown to give.
 
 ## The breaker
 

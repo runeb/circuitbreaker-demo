@@ -64,6 +64,7 @@
       <div><dt class="err">Error <code class="code">502</code></dt><dd id="c-error">0</dd></div>
       <div><dt class="warn">Timeout <code class="code">504</code></dt><dd id="c-timeout">0</dd></div>
       <div><dt class="rej">Rejected <code class="code">503</code></dt><dd id="c-rejected">0</dd></div>
+      <div hidden><dt class="dead">Unreachable</dt><dd id="c-unreachable">0</dd></div>
       <div><dt>p50 latency</dt><dd id="c-latency">–</dd></div>
       <div><dt>Calls reaching dep.</dt><dd id="c-reached">0</dd></div>
     </dl>
@@ -77,8 +78,8 @@
     <dl class="stats">
       <div><dt>Consecutive failures</dt><dd id="stat-fails">0 / 5</dd></div>
       <div><dt>Probe successes</dt><dd id="stat-successes">–</dd></div>
-      <div><dt>Reopens in</dt><dd id="stat-countdown">–</dd></div>
-      <div><dt>Call timeout</dt><dd id="stat-timeout">1000ms</dd></div>
+      <div><dt>Half-open in</dt><dd id="stat-countdown">–</dd></div>
+      <div><dt>Call timeout</dt><dd id="stat-timeout">1000 ms</dd></div>
     </dl>
     <button id="reset">Reset breaker</button>
   </div>

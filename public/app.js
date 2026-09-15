@@ -30,14 +30,21 @@ function setRate(next) {
 }
 
 async function fire() {
-  // Don't let a slow dependency build an unbounded queue in the browser.
-  if (inFlight > 20) return;
+  // Don't let a slow dependency build an unbounded queue in the browser. Note
+  // this is rarely the real limit: browsers allow ~6 connections per host over
+  // HTTP/1.1, so a slow dependency queues requests - including the state polls -
+  // well before this cap is reached.
+  if (inFlight >= 20) return;
   inFlight++;
   try {
     const res = await api('/api/call');
     render(await res.json());
   } catch {
-    render({ ok: false, outcome: 'error', status: 0, detail: 'network error', latencyMs: 0 });
+    // The API itself is unreachable, which says nothing about the dependency.
+    // Drawing it as a dependency error would be the visualisation lying: this
+    // request never got far enough to find out. `npm run dev` restarts produce
+    // a burst of these.
+    render({ ok: false, outcome: 'unreachable', status: 0, detail: 'no response from API', latencyMs: 0 });
   } finally {
     inFlight--;
   }
@@ -45,20 +52,23 @@ async function fire() {
 
 // ---- rendering ----------------------------------------------------------
 
-const TONE = { success: 'ok', error: 'err', timeout: 'warn', rejected: 'rej' };
+const TONE = { success: 'ok', error: 'err', timeout: 'warn', rejected: 'rej', unreachable: 'dead' };
 
 function render(r) {
   recent.push(r);
   if (recent.length > HISTORY) recent.shift();
   addTick(r);
 
+  // Light up only the hops the request actually made. A rejected call reaches
+  // the API and stops there; an unreachable one never even got that far.
   const tone = TONE[r.outcome] ?? 'err';
-  pulse('node-browser', tone);
-  pulse('node-api', tone);
-  flash('edge-client', tone);
+  const reachedApi = r.outcome !== 'unreachable';
+  const reachedDependency = reachedApi && r.outcome !== 'rejected';
 
-  // A rejected call never leaves the API — the dependency edge stays dark.
-  if (r.outcome !== 'rejected') {
+  pulse('node-browser', tone);
+  flash('edge-client', tone);
+  if (reachedApi) pulse('node-api', tone);
+  if (reachedDependency) {
     pulse('node-dep', tone);
     flash('edge-dep', tone);
   }
@@ -69,12 +79,14 @@ function render(r) {
     ` ${r.outcome.padEnd(9)} ${String(r.latencyMs).padStart(5)}ms  ${r.detail ?? ''}`;
 
   const window = recent.slice(-WINDOW);
-  const counts = { success: 0, error: 0, timeout: 0, rejected: 0 };
+  const counts = { success: 0, error: 0, timeout: 0, rejected: 0, unreachable: 0 };
   for (const x of window) counts[x.outcome] = (counts[x.outcome] ?? 0) + 1;
   $('c-success').textContent = counts.success;
   $('c-error').textContent = counts.error;
   $('c-timeout').textContent = counts.timeout;
   $('c-rejected').textContent = counts.rejected;
+  $('c-unreachable').parentElement.hidden = counts.unreachable === 0;
+  $('c-unreachable').textContent = counts.unreachable;
 
   const lats = window.map((x) => x.latencyMs).sort((a, b) => a - b);
   $('c-latency').textContent = lats.length ? `${lats[Math.floor(lats.length / 2)]} ms` : '–';
@@ -102,16 +114,17 @@ function addTick(r) {
   const bar = document.createElement('div');
   bar.className = `tick ${TONE[r.outcome] ?? 'err'}`;
   bar.style.height = `${barHeight(r.latencyMs, timeoutMs)}%`;
-  bar.title = `${r.status ?? '---'} ${r.outcome} @ ${r.admittedIn ?? '?'} \u00b7 ${r.latencyMs}ms`;
+  const admitted = r.admittedIn ? ` @ ${r.admittedIn}` : '';
+  bar.title = `${r.status ?? '---'} ${r.outcome}${admitted} \u00b7 ${r.latencyMs}ms`;
   laneOutcomes.append(bar);
 
   // The band shows the state that handled each response, not the state it left
   // behind: a probe that fails has already re-opened the breaker by then, which
   // is why HALF_OPEN was never visible here.
-  const state = r.admittedIn ?? r.breaker?.state ?? 'CLOSED';
+  const state = r.admittedIn ?? r.breaker?.state ?? 'UNKNOWN';
   const cell = document.createElement('div');
   cell.className = `cell ${state}`;
-  cell.title = `admitted in ${state}`;
+  cell.title = state === 'UNKNOWN' ? 'no answer from the API' : `admitted in ${state}`;
   laneState.append(cell);
 
   while (laneOutcomes.childElementCount > HISTORY) laneOutcomes.firstElementChild.remove();
@@ -147,12 +160,20 @@ function pulse(id, tone) {
   el._t = setTimeout(() => (el.className = 'node'), 220);
 }
 
+const FLOW_TONES = ['flow-ok', 'flow-err', 'flow-warn', 'flow-rej', 'flow-dead'];
+
+/**
+ * Touch only the flow-* classes. Rewriting className here used to wipe the
+ * dashed `cut` edge that renderBreaker owns, so the open circuit blinked solid
+ * for 220ms immediately after a probe failed - the most important frame in the
+ * demo.
+ */
 function flash(id, tone) {
   const el = $(id);
-  const cut = el.classList.contains('cut');
-  el.className = `edge flow-${tone}${cut ? ' cut' : ''}`;
   clearTimeout(el._t);
-  el._t = setTimeout(() => (el.className = `edge${cut ? ' cut' : ''}`), 220);
+  el.classList.remove(...FLOW_TONES);
+  el.classList.add(`flow-${tone}`);
+  el._t = setTimeout(() => el.classList.remove(`flow-${tone}`), 220);
 }
 
 // ---- controls -----------------------------------------------------------
@@ -180,7 +201,7 @@ const flushDependency = throttle(() => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(patch),
-  });
+  }).catch(() => {}); // the controls are best-effort; the request loop reports outages
 }, 80);
 
 function pushDependency(patch) {
@@ -198,7 +219,7 @@ function syncControls(dep) {
   describeDependency();
 }
 
-/** Only write when the value actually differs; this runs several times a second. */
+/** Only write when the value actually differs, to avoid pointless DOM churn. */
 function setControl(input, output, value, label) {
   if (Number(input.value) !== value) input.value = value;
   if (output.textContent !== label) output.textContent = label;
@@ -243,10 +264,15 @@ $('reset').addEventListener('click', async () => {
 // The breaker's OPEN -> HALF_OPEN transition is time-based, so keep the panel
 // live (and the countdown ticking) even when no request has just returned.
 setInterval(async () => {
-  const res = await api('/api/state');
-  const s = await res.json();
-  renderBreaker(s.breaker);
-  $('c-reached').textContent = s.callsReceived;
+  try {
+    const res = await api('/api/state');
+    const s = await res.json();
+    renderBreaker(s.breaker);
+    $('c-reached').textContent = s.callsReceived;
+  } catch {
+    // Server gone. The request loop already draws that; don't also fill the
+    // console with an unhandled rejection five times a second.
+  }
 }, 200);
 
 // Another tab (or a curl) may already have changed the dependency; don't show
