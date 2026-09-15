@@ -2,6 +2,8 @@
 
 An interactive demo of infrastructure that degrades predictably under stress.
 
+**[Open the demo](https://runeb.github.io/circuitbreaker-demo/)**
+
 A browser calls an API, which reaches a dependency through a circuit breaker.
 You break the dependency; the page shows what happens to the calls and to the
 breaker, as it happens.
